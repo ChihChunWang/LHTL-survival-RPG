@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>期末考週生存戰：大腦神經科學 RPG -- LHTL期末專案</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+<div class="container">
+    <header>
+        <div class="badge project-badge">🧠 學會學 — 期末專案</div>
+        <h1>‼️期末考週生存戰‼️</h1>
+    </header>
+
+    <div id="start-screen">
+        <p class="story-text" id="intro-text"></p>
+        <button class="start-btn" onclick="startGame()">啟動大腦神經網路，開始挑戰 !!!</button>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-header">
+                    <span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;">
+                            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                        </svg>
+                        組塊理解度
+                    </span>
+                    <span id="val-chunk">20 / 100</span>
+                </div>
+                <div class="progress-bg">
+                    <div id="bar-chunk" class="progress-fill" style="width: 20%; background: var(--accent-green);"></div>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-header">
+                    <span>⚡ 精力</span>
+                    <span id="val-energy">80 / 100</span>
+                </div>
+                <div class="progress-bg">
+                    <div id="bar-energy" class="progress-fill" style="width: 80%; background: var(--accent-blue);"></div>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-header">
+                    <span>🔥 焦慮值</span>
+                    <span id="val-anxiety">30 / 100</span>
+                </div>
+                <div class="progress-bg">
+                    <div id="bar-anxiety" class="progress-fill" style="width: 30%; background: var(--accent-red);"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="event-area">
+            <div class="time-indicator" id="event-time">Day 1 早上</div>
+            <p class="story-text" id="event-desc"></p>
+            <div class="choices" id="choices-container"></div>
+        </div>
+
+        <div id="feedback-area" class="feedback-box hidden">
+            <div class="feedback-title">🖋️ 大腦神經科學解析：<span id="concept-tag"></span></div>
+            <div class="stat-changes" id="stat-changes"></div>
+            <p id="feedback-text" style="color: #e2e8f0; font-size: 0.95rem;"></p>
+            <button class="next-btn" onclick="nextTurn()">進入下一個時段 ➔</button>
+        </div>
+    </div>
+
+    <div id="end-screen" class="hidden ending-card">
+        <div class="badge" id="ending-badge">期末考成績結算</div>
+        <h2 class="ending-title" id="ending-title"></h2>
+        <p class="story-text" id="ending-desc" style="text-align: left;"></p>
+        
+        <div class="concept-list">
+            <h3>本局啟動的《學會學》核心機制回顧：</h3>
+            <ul id="learned-concepts"></ul>
+        </div>
+
+        <button class="start-btn" onclick="resetGame()">重新開始，嘗試不同的學習策略 !!!</button>
+    </div>
+</div>
+
+<script src="./questions.js"></script>
+
+<script>
+    document.getElementById('intro-text').innerHTML = GAME_CONFIG.introText;
+
+    let currentTurn = 0;
+    let stats = { chunk: 20, energy: 80, anxiety: 30 };
+    let learnedConcepts = [];
+
+    function clamp(val) {
+        return Math.max(0, Math.min(100, val));
+    }
+
+    function updateUI() {
+        document.getElementById('val-chunk').innerText = `${stats.chunk} / 100`;
+        document.getElementById('bar-chunk').style.width = `${stats.chunk}%`;
+
+        document.getElementById('val-energy').innerText = `${stats.energy} / 100`;
+        document.getElementById('bar-energy').style.width = `${stats.energy}%`;
+
+        document.getElementById('val-anxiety').innerText = `${stats.anxiety} / 100`;
+        document.getElementById('bar-anxiety').style.width = `${stats.anxiety}%`;
+    }
+
+    function startGame() {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+        renderTurn();
+    }
+
+    function shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    function renderTurn() {
+        const ev = EVENTS_DATA[currentTurn];
+        document.getElementById('event-time').innerText = ev.time;
+        document.getElementById('event-desc').innerText = ev.desc;
+        document.getElementById('feedback-area').classList.add('hidden');
+        
+        const choicesDiv = document.getElementById('choices-container');
+        choicesDiv.innerHTML = '';
+
+        const randomizedChoices = shuffleArray(ev.choices);
+
+        randomizedChoices.forEach((choice, idx) => {
+            const btn = document.createElement('button');
+            btn.className = 'choice-btn';
+            const optionLabel = String.fromCharCode(65 + idx); 
+            btn.innerHTML = `<span class="choice-tag">選項 ${optionLabel}｜${choice.tag}</span><span>${choice.text}</span>`;
+            btn.onclick = () => selectChoice(choice, btn);
+            choicesDiv.appendChild(btn);
+        });
+    }
+
+    function selectChoice(choice, selectedBtn) {
+        stats.chunk = clamp(stats.chunk + choice.effects.chunk);
+        stats.energy = clamp(stats.energy + choice.effects.energy);
+        stats.anxiety = clamp(stats.anxiety + choice.effects.anxiety);
+        updateUI();
+
+        if (!learnedConcepts.includes(choice.concept)) {
+            learnedConcepts.push(choice.concept);
+        }
+
+        const btns = document.querySelectorAll('.choice-btn');
+        btns.forEach(b => {
+            b.disabled = true;
+            if (b === selectedBtn) {
+                b.classList.add('selected');
+            } else {
+                b.classList.add('dimmed');
+            }
+        });
+
+        const formatDelta = (label, val) => {
+            if (val === 0) return '';
+            const color = (label === '焦慮') 
+                ? (val < 0 ? 'var(--accent-green)' : 'var(--accent-red)')
+                : (val > 0 ? 'var(--accent-green)' : 'var(--accent-red)');
+            const sign = val > 0 ? '+' : '';
+            return `<span style="color:${color}">${label} ${sign}${val}</span>`;
+        };
+
+        document.getElementById('concept-tag').innerText = choice.concept;
+        document.getElementById('stat-changes').innerHTML = 
+            formatDelta('理解度', choice.effects.chunk) + 
+            formatDelta('精力', choice.effects.energy) + 
+            formatDelta('焦慮', choice.effects.anxiety);
+        document.getElementById('feedback-text').innerText = choice.explanation;
+        
+        const nextBtn = document.querySelector('.next-btn');
+        nextBtn.innerText = (currentTurn === EVENTS_DATA.length - 1) ? "交卷！查看期末考結局！" : "進入下一個時段 ➔";
+        document.getElementById('feedback-area').classList.remove('hidden');
+    }
+
+    function nextTurn() {
+        if (stats.energy <= 0 || stats.anxiety >= 100 || currentTurn === EVENTS_DATA.length - 1) {
+            showEnding();
+        } else {
+            currentTurn++;
+            renderTurn();
+        }
+    }
+
+    function showEnding() {
+        document.getElementById('game-screen').classList.add('hidden');
+        document.getElementById('end-screen').classList.remove('hidden');
+
+        const titleEl = document.getElementById('ending-title');
+        const descEl = document.getElementById('ending-desc');
+
+        if (stats.energy <= 0) {
+            titleEl.innerText = "☠️ 結局：大腦冒火當機，考試直接爆炸!";
+            titleEl.style.color = "var(--accent-red)";
+            descEl.innerText = "因為過度透支精力與熬夜，你的大腦在進考場前徹底罷工。這證明了：學習不是比誰坐得久，沒有充足的睡眠與精力管理，再多努力都無法轉化為長期記憶。";
+        } else if (stats.anxiety >= 100) {
+            titleEl.innerText = "🧟 結局：不及格! 考試的時候東不懂西忘記的!";
+            titleEl.style.color = "var(--accent-yellow)";
+            descEl.innerText = "痛覺中樞與比較心態讓你陷入嚴重的考試恐慌，工作記憶被焦慮塞滿，讓你變得跟殭屍一樣無法思考，原本會寫的題目也一片空白。下次試著用番茄鐘與腹式呼吸奪回大腦主導權吧！";
+        } else if (stats.chunk >= 75) {
+            titleEl.innerText = "💯 結局：吉霸昏，你是一位學習高手!!";
+            titleEl.style.color = "var(--accent-green)";
+            descEl.innerText = `太神啦！你以【理解度 ${stats.chunk}、精力 ${stats.energy}、焦慮 ${stats.anxiety}】的完美狀態征服了期末考！你成功運用了專注與發散模式的切換、主動提取練習、組塊化學習與先難後易法則，把知識真正刻進了神經網路中。`;
+        } else {
+            titleEl.innerText = "😮‍💨 結局：低空飛過，一覺醒來又還回去了 !!";
+            titleEl.style.color = "var(--accent-blue)";
+            descEl.innerText = `你勉強撐過了期末考（理解度 ${stats.chunk}），雖然沒有被當，但因為過程中落入了一些「能力錯覺」或無效努力，考完試後知識很快就遺忘了。試著用「蓋上書本回想（Recall）」的方式再挑戰一次高分吧！`;
+        }
+
+        const ul = document.getElementById('learned-concepts');
+        ul.innerHTML = '';
+        learnedConcepts.forEach(c => {
+            const li = document.createElement('li');
+            li.innerText = c;
+            ul.appendChild(li);
+        });
+    }
+
+    function resetGame() {
+        currentTurn = 0;
+        stats = { chunk: 20, energy: 80, anxiety: 30 };
+        learnedConcepts = [];
+        updateUI();
+        document.getElementById('end-screen').classList.add('hidden');
+        document.getElementById('start-screen').classList.remove('hidden');
+    }
+</script>
+
+</body>
+</html>
